@@ -1,81 +1,139 @@
-/*
-  Rui Santos
-  Complete project details at https://RandomNerdTutorials.com/esp-now-esp8266-nodemcu-arduino-ide/
-  
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files.
-  
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
+/* ESP32S2 ESPNow based Nerf Tank remote
+ * By Juntendo
 */
 
-#include <ESP8266WiFi.h>
-#include <espnow.h>
+#include <esp_now.h>
+#include <WiFi.h> //Use official EPS library (Not arduino)
 
-// REPLACE WITH RECEIVER MAC Address
-uint8_t broadcastAddress[] = {0xC4, 0x5B, 0xBE, 0x62, 0xEE, 0x80};
+const int button_pin = 12;
+const int Rx_pin = 9; //ADC1_8
+const int Ry_pin = 7; //ADC1_6
+
+int Rx_value = 0;
+int Ry_value = 0;
+bool buttonState;
+
+//Button paramters
+boolean buttonActive = false;
+boolean longPressActive = false;
+
+unsigned long buttonTimer =0; //Debounce timer
+unsigned long longPressTime = 500;  //Long press duration
+
+//State mode paramters
+boolean fireCommand;
+boolean turretMode;
+
+void longPressed(){
+  //Fire sequence
+  fireCommand = 1;
+}
+
+void shortPressed(){
+  //Mode change sequence
+  turretMode = 1 - turretMode;
+}
+
+
+// REPLACE WITH YOUR RECEIVER MAC Address
+uint8_t broadcastAddress[] = {0x70, 0x04, 0x1D, 0xF5, 0x9A, 0xE8};
 
 // Structure example to send data
 // Must match the receiver structure
+
 typedef struct struct_message {
-  char a[32];
-  int b;
-  float c;
-  String d;
-  bool e;
+  int Rx;
+  int Ry;
+  bool buttonMode;
+  bool buttonFire;
 } struct_message;
+
 
 // Create a struct_message called myData
 struct_message myData;
 
-unsigned long lastTime = 0;  
-unsigned long timerDelay = 2000;  // send readings timer
+esp_now_peer_info_t peerInfo;
 
-// Callback when data is sent
-void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
-  Serial.print("Last Packet Send Status: ");
-  if (sendStatus == 0){
-    Serial.println("Delivery success");
-  }
-  else{
-    Serial.println("Delivery fail");
-  }
+// callback when data is sent
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("\r\nLast Packet Send Status:\t");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
  
 void setup() {
   // Init Serial Monitor
   Serial.begin(115200);
- 
+
+  //  Initialise pins
+  pinMode(button_pin, INPUT);
+  
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
 
   // Init ESP-NOW
-  if (esp_now_init() != 0) {
+  if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
 
   // Once ESPNow is successfully Init, we will register for Send CB to
   // get the status of Trasnmitted packet
-  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
   esp_now_register_send_cb(OnDataSent);
   
   // Register peer
-  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  
+  // Add peer        
+  if (esp_now_add_peer(&peerInfo) != ESP_OK){
+    Serial.println("Failed to add peer");
+    return;
+  }
 }
  
 void loop() {
-  if ((millis() - lastTime) > timerDelay) {
-    // Set values to send
-    strcpy(myData.a, "THIS IS A CHAR");
-    myData.b = random(1,20);
-    myData.c = 1.2;
-    myData.d = "Hello";
-    myData.e = false;
+  //Read ADC value
+  Rx_value = analogRead(Rx_pin);
+  Ry_value = analogRead(Ry_pin);
 
-    // Send message via ESP-NOW
-    esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
-
-    lastTime = millis();
+  //Button
+  if (digitalRead(button) == LOW){
+    if(buttonActive == false){
+      buttonActive = true;
+      buttonTimer = millis();
+    }
+    if ((millis() - buttonTimer > longPressTime) && (longPressActive == false)) {
+      longPressActive = true;
+      longPressed();
+    }
   }
+  else{
+    if (buttonActive == true){
+      if (longPressActive == true){
+        longPressActive = false;
+      }
+      else{
+        shortPressed();
+      }
+      buttonActive = false;
+    }
+  }
+  
+  // Set values to send
+  myData.Rx = Rx_value;
+  myData.Ry = Ry_value;
+  
+  // Send message via ESP-NOW
+  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
+   
+  if (result == ESP_OK) {
+    Serial.println("Sent with success");
+  }
+  else {
+    Serial.println("Error sending the data");
+  }
+  //Clear fire command after send;
+  fireCommand = 0;
+  delay(2000);
 }
