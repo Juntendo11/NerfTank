@@ -44,8 +44,8 @@ uint8_t broadcastAddress[] = {0x70, 0x04, 0x1D, 0xF5, 0x9A, 0xE8};
 typedef struct struct_message {
   int Rx;
   int Ry;
-  bool buttonMode;
-  bool buttonFire;
+  bool turretMode;
+  bool fireCommand;
 } struct_message;
 
 
@@ -98,7 +98,7 @@ void loop() {
   Ry_value = analogRead(Ry_pin);
 
   //Button
-  if (digitalRead(button) == LOW){
+  if (digitalRead(button_pin) == LOW){
     if(buttonActive == false){
       buttonActive = true;
       buttonTimer = millis();
