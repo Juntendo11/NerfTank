@@ -51,9 +51,9 @@ void loop() {
 
   // Stop the DC motorz
   Serial.println("Motor stopped");
-  digitalWrite(motor1Pin1, LOW);
+  digitalWrite(motor1Pin1, HIGH);
   digitalWrite(motor1Pin2, LOW);
-  digitalWrite(motor1Pin3, LOW);
+  digitalWrite(motor1Pin3, HIGH);
   digitalWrite(motor1Pin4, LOW);
   delay(1000);
 

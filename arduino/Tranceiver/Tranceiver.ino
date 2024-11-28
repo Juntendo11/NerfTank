@@ -21,19 +21,18 @@ unsigned long buttonTimer =0; //Debounce timer
 unsigned long longPressTime = 500;  //Long press duration
 
 //State mode paramters
-boolean fireCommand;
-boolean turretMode;
+boolean fireCommand = false;
+boolean turretMode = false;
 
-void longPressed(){
+void longPressed() {
   //Fire sequence
   fireCommand = 1;
 }
 
-void shortPressed(){
+void shortPressed() {
   //Mode change sequence
   turretMode = 1 - turretMode;
 }
-
 
 // REPLACE WITH YOUR RECEIVER MAC Address
 uint8_t broadcastAddress[] = {0x70, 0x04, 0x1D, 0xF5, 0x9A, 0xE8};
@@ -123,6 +122,8 @@ void loop() {
   // Set values to send
   myData.Rx = Rx_value;
   myData.Ry = Ry_value;
+  myData.turretMode = turretMode;
+  myData.fireCommand = fireCommand;
   
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));

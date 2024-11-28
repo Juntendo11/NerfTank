@@ -11,6 +11,8 @@
 typedef struct struct_message {
   int Rx;
   int Ry;
+  bool turretMode;
+  bool fireCommand;
 } struct_message;
 
 struct_message myData;
@@ -22,7 +24,7 @@ int motor1Pin3 = 7;
 int motor1Pin4 = 9; 
 
 int enableA = 11; //1,2
-int enableB = 12; //3,4
+int enableB = 12; //3,4 
 
 
 // Setting PWM properties
@@ -35,12 +37,14 @@ int dutyCycle = 255;
 // callback function that will be executed when data is received
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&myData, incomingData, sizeof(myData));
-
   Serial.print("Rx: ");
   Serial.println(myData.Rx);
   Serial.print("Ry: ");
   Serial.println(myData.Ry);
-
+  Serial.print("turretMode: ");
+  Serial.println(myData.turretMode);
+  Serial.print("fireCommand: ");
+  Serial.println(myData.fireCommand);
   Serial.println();
 }
 
@@ -63,9 +67,11 @@ void setup() {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
+  Serial.println("Initialized ESP-NOW");
   // Once ESPNow is successfully Init, we will register for recv CB to
   // get recv packer info
   esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
+  //Wont be in the loop from here
 
 }
 
