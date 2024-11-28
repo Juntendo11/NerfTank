@@ -5,34 +5,19 @@
 #include <esp_now.h>
 #include <WiFi.h> //Use official EPS library (Not arduino)
 
-const int button_pin = 12;
 const int Rx_pin = 9; //ADC1_8
 const int Ry_pin = 7; //ADC1_6
-
-int Rx_value = 0;
-int Ry_value = 0;
-bool buttonState;
+const int button_pin = 12;
 
 //Button paramters
 boolean buttonActive = false;
 boolean longPressActive = false;
-
-unsigned long buttonTimer =0; //Debounce timer
+unsigned long buttonTimer = 50; //Debounce timer
 unsigned long longPressTime = 500;  //Long press duration
 
 //State mode paramters
 boolean fireCommand = false;
 boolean turretMode = false;
-
-void longPressed() {
-  //Fire sequence
-  fireCommand = 1;
-}
-
-void shortPressed() {
-  //Mode change sequence
-  turretMode = 1 - turretMode;
-}
 
 // REPLACE WITH YOUR RECEIVER MAC Address
 uint8_t broadcastAddress[] = {0x70, 0x04, 0x1D, 0xF5, 0x9A, 0xE8};
@@ -64,7 +49,7 @@ void setup() {
   Serial.begin(115200);
 
   //  Initialise pins
-  pinMode(button_pin, INPUT);
+  pinMode(button_pin, INPUT_PULLUP);
   
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
@@ -84,7 +69,7 @@ void setup() {
   peerInfo.channel = 0;  
   peerInfo.encrypt = false;
   
-  // Add peer        
+  // Add peer
   if (esp_now_add_peer(&peerInfo) != ESP_OK){
     Serial.println("Failed to add peer");
     return;
@@ -93,9 +78,9 @@ void setup() {
  
 void loop() {
   //Read ADC value
-  Rx_value = analogRead(Rx_pin);
-  Ry_value = analogRead(Ry_pin);
-
+  int Rx_value = analogRead(Rx_pin);
+  int Ry_value = analogRead(Ry_pin);
+  
   //Button
   if (digitalRead(button_pin) == LOW){
     if(buttonActive == false){
@@ -103,8 +88,10 @@ void loop() {
       buttonTimer = millis();
     }
     if ((millis() - buttonTimer > longPressTime) && (longPressActive == false)) {
+      //longPressed;
       longPressActive = true;
-      longPressed();
+      //Serial.println("Long press");
+      fireCommand = true;
     }
   }
   else{
@@ -113,7 +100,9 @@ void loop() {
         longPressActive = false;
       }
       else{
-        shortPressed();
+        //Short press active
+        Serial.println("Short Press detected");
+        turretMode = !turretMode;
       }
       buttonActive = false;
     }
@@ -125,16 +114,28 @@ void loop() {
   myData.turretMode = turretMode;
   myData.fireCommand = fireCommand;
   
+  //Debug
+
+  Serial.print("Rx: ");
+  Serial.println(myData.Rx);
+  Serial.print("Ry: ");
+  Serial.println(myData.Ry);
+  Serial.print("turretMode: ");
+  Serial.println(myData.turretMode);
+  Serial.print("fireCommand: ");
+  Serial.println(myData.fireCommand);
+  Serial.println();
+
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
    
   if (result == ESP_OK) {
-    Serial.println("Sent with success");
+    //Serial.println("Sent with success");
   }
   else {
-    Serial.println("Error sending the data");
+    //Serial.println("Error sending the data");
   }
   //Clear fire command after send;
-  fireCommand = 0;
-  delay(2000);
+  fireCommand = false;
+  delay(100); //10 transmissions per seconds
 }
